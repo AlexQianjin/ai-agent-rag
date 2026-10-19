@@ -23,7 +23,7 @@ type ManagedUser = {
 };
 
 export function UsersPage() {
-  const { data: session, isPending } = authClient.useSession();
+  const { data: session, isPending, isRefetching } = authClient.useSession();
   const queryClient = useQueryClient();
   const form = useForm<CreateUserValues>({
     resolver: zodResolver(createUserSchema),
@@ -86,7 +86,7 @@ export function UsersPage() {
     },
   });
 
-  if (isPending) {
+  if (isPending || (!session && isRefetching)) {
     return <p className="text-sm text-zinc-400">Checking your session…</p>;
   }
   if (!session) {

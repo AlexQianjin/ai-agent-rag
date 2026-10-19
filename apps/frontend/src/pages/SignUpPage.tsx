@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router";
 import { z } from "zod";
 
-import { authClient } from "../lib/auth-client";
+import { authClient, waitForSessionUser } from "../lib/auth-client";
 
 const signUpSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -24,6 +24,13 @@ export function SignUpPage() {
     const { error } = await authClient.signUp.email(values);
     if (error) {
       form.setError("root", { message: error.message ?? "Could not create the account." });
+      return;
+    }
+    try {
+      await waitForSessionUser();
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "The session did not start.";
+      form.setError("root", { message });
       return;
     }
     await navigate("/users");

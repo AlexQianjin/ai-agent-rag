@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router";
 import { z } from "zod";
 
-import { authClient } from "../lib/auth-client";
+import { authClient, waitForSessionUser } from "../lib/auth-client";
 
 const loginSchema = z.object({
   email: z.email("Enter a valid email"),
@@ -23,6 +23,13 @@ export function LoginPage() {
     const { error } = await authClient.signIn.email(values);
     if (error) {
       form.setError("root", { message: error.message ?? "Could not log in." });
+      return;
+    }
+    try {
+      await waitForSessionUser();
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "The session did not start.";
+      form.setError("root", { message });
       return;
     }
     await navigate("/users");
