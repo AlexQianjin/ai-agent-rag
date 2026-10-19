@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from "react-router";
 
 import { Layout } from "./components/Layout";
+import { DocumentsPage } from "./pages/DocumentsPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 import { LogoutPage } from "./pages/LogoutPage";
@@ -17,6 +18,7 @@ export default function App() {
           <Route path="login" element={<LoginPage />} />
           <Route path="logout" element={<LogoutPage />} />
           <Route path="users" element={<UsersPage />} />
+          <Route path="documents" element={<DocumentsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

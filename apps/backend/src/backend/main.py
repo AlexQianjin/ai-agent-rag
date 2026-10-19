@@ -11,9 +11,11 @@ from sqlalchemy.orm import Session
 from backend.auth import AuthenticatedUser, CurrentUser
 from backend.config import get_settings
 from backend.db import get_db
+from backend.documents import router as documents_router
 
 settings = get_settings()
 app = FastAPI(title="ai-agent-rag", version="0.1.0")
+app.include_router(documents_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,

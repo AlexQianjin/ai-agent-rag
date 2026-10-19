@@ -3,7 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     database_url: str
     auth_url: str = "http://127.0.0.1:3001"
     cors_origins: str = "http://localhost:5173,http://localhost:8080"
+    max_upload_bytes: int = Field(default=20 * 1024 * 1024, ge=1)
 
     @property
     def cors_origin_list(self) -> list[str]:

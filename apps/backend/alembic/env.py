@@ -6,13 +6,14 @@ from alembic import context
 from sqlalchemy import create_engine, pool
 
 from backend.config import get_settings
+from backend.models import Base
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = None
+target_metadata = Base.metadata
 
 # Better Auth creates and owns these tables through its own migrator.
 # Alembic autogenerate must leave them alone.
