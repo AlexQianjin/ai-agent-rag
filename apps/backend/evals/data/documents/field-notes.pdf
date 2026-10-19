@@ -1,0 +1,49 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 532 >>
+stream
+BT
+/F1 16 Tf
+/F1 16 Tf
+1 0 0 1 72 740 Tm (North plot) Tj
+/F1 12 Tf
+1 0 0 1 72 712 Tm (The north plot soil pH is 6.4, measured with the Fern kit.) Tj
+/F1 16 Tf
+1 0 0 1 72 684 Tm (Valve V7) Tj
+/F1 12 Tf
+1 0 0 1 72 656 Tm (Irrigation valve V7 leaks one drip per second.) Tj
+/F1 16 Tf
+1 0 0 1 72 628 Tm (Scarecrow) Tj
+/F1 12 Tf
+1 0 0 1 72 600 Tm (The scarecrow wears a green coat and faces east.) Tj
+/F1 16 Tf
+1 0 0 1 72 572 Tm (Rain gauge) Tj
+/F1 12 Tf
+1 0 0 1 72 544 Tm (The rain gauge on the first of June read 11 millimeters.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000824 00000 n 
+trailer << /Size 6 /Root 1 0 R >>
+startxref
+894
+%%EOF

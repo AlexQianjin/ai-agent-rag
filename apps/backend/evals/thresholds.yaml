@@ -1,0 +1,15 @@
+# Floors for the gated metrics. Dense and BM25 are reported and are not gated.
+# Hybrid floors sit under a measured run on this golden set (hybrid was 1.0),
+# with room for a few ranking changes. Answer floors apply only to a judged run.
+k: 5
+retrieval:
+  hybrid:
+    hit_rate: 0.85
+    recall_at_k: 0.85
+    mrr: 0.8
+    ndcg_at_k: 0.8
+answer:
+  faithfulness: 0.7
+  relevance: 0.7
+  citation_accuracy: 0.7
+  refusal_correctness: 0.75

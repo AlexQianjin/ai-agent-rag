@@ -226,3 +226,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Eval runs. The example report stays in git.
+apps/backend/evals/reports/*
+!apps/backend/evals/reports/example.json
+!apps/backend/evals/reports/example.md

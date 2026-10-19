@@ -57,7 +57,8 @@ The list below is the planned stack. The repository currently contains the works
 │       ├── Dockerfile
 │       ├── .dockerignore
 │       ├── alembic.ini
-│       └── alembic/       # Application migrations; does not own auth tables
+│       ├── alembic/       # Application migrations; does not own auth tables
+│       └── evals/         # Golden questions, retrieval and answer metrics
 ├── docker-compose.yml
 ├── .env.example
 ├── .dockerignore          # Used by the frontend image build
@@ -268,6 +269,27 @@ LLM_MODEL=grok-4.7
 Leave the key out of git. The placeholder in `.env.example` is commented out. Without a key the stream returns an error event and does not call xAI.
 
 The graph is three steps: recall, retrieve, answer. Recall is where mem0 will plug in. It returns no memories today, and the answer step already reads that list when it is present.
+
+### Evaluation
+
+`apps/backend/evals` holds a small golden set: four short documents written for this repo (two text notes, a DOCX, and a PDF) and about two dozen questions in `evals/data/cases.yaml`. An answerable question names the document and chunk that contain the answer, and lists the facts a good answer includes. An unanswerable question is one the agent should refuse. Add a case by appending a block to that file.
+
+The scorer is a short custom harness. Ragas and DeepEval can judge an answer, and either would fit the OpenAI-compatible client, but neither compares this app's dense search, BM25 search, and hybrid fusion, and neither checks that a citation names the expected document and chunk. Those are the measurements this set is for. The judge still calls the same chat-completions endpoint as the agent. The wording it scores with is in `evals/prompts`.
+
+```bash
+pnpm eval:retrieval
+pnpm eval
+```
+
+Those scripts run from `apps/backend`. The same commands are `uv run python -m evals.run --retrieval-only` and `uv run python -m evals.run`.
+
+`pnpm eval:retrieval` needs Ollama with `bge-m3` and a Qdrant server. It does not need an API key or Postgres. It deletes and rebuilds a collection named `eval_golden` (set `EVAL_COLLECTION` to use another name; it will not touch `documents`), embeds the sample documents, and reports hit rate, recall@k, MRR, and nDCG@k for dense-only, BM25-only, and hybrid reciprocal rank fusion. Unanswerable questions are left out of those averages. Hybrid search is the same call the agent uses: a wider candidate list from each method, fused with k = 60, then cut to the top k. The dense-only and BM25-only columns rank the top k directly.
+
+`pnpm eval` also runs the LangGraph agent on every question and scores the answer. The agent uses `XAI_API_KEY`, `LLM_BASE_URL`, and `LLM_MODEL`, which default to Grok at `https://api.x.ai/v1`. The judge uses that same key and endpoint unless `JUDGE_MODEL` or `JUDGE_BASE_URL` is set. It scores faithfulness to the passages, relevance to the key facts, and whether a refusal was the right call. Citation accuracy is exact: an answer is right when a bracketed source number points at the expected document and chunk. Each question records answer latency, judge latency, and token counts when the endpoint returns them.
+
+The run writes a JSON file and a Markdown file under `apps/backend/evals/reports`. That directory is gitignored except for `example.json` and `example.md`, which show the shape of a report. The Markdown lists each question that missed. Floors live in `evals/thresholds.yaml`. Hybrid retrieval is gated. Dense and BM25 are printed so the hybrid choice can be compared, and they do not fail the run on their own. Answer floors apply only when the judge ran. A metric under its floor exits with status 1. `uv run python -m evals.run --check evals/reports/some-report.json` repeats that comparison against a saved report.
+
+GitHub Actions runs the unit tests that do not need Postgres, then this retrieval eval, on every pull request. The judged eval is a manually triggered workflow. It runs only when the `XAI_API_KEY` repository secret is set, and it skips itself without failing when the secret is absent.
 
 ### Other scripts
 

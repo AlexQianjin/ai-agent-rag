@@ -1,0 +1,207 @@
+# Golden questions for the sample documents in this directory.
+# Answerable cases name the file and the chunk index from the Markdown chunker.
+# Unanswerable cases should be refused. Add a case by appending a block.
+
+- id: apple-variety
+  question: What variety is the crimson apple?
+  expected_document: orchard.txt
+  expected_chunk: 0
+  key_facts:
+    - Lumen
+  unanswerable: false
+
+- id: hive-queen
+  question: What is the queen bee named in the south hive?
+  expected_document: orchard.txt
+  expected_chunk: 1
+  key_facts:
+    - Marrow
+    - twelve frames
+  unanswerable: false
+
+- id: cider-press
+  question: Which model is the cider press, and how many liters did it produce?
+  expected_document: orchard.txt
+  expected_chunk: 2
+  key_facts:
+    - Kettle-9
+    - 18 liters
+  unanswerable: false
+
+- id: shed-code
+  question: What is the orchard shed gate code?
+  expected_document: orchard.txt
+  expected_chunk: 3
+  key_facts:
+    - "4417"
+  unanswerable: false
+
+- id: boat-pier
+  question: At which pier is the blue fishing boat Pellucid moored?
+  expected_document: harbor.txt
+  expected_chunk: 0
+  key_facts:
+    - pier 4
+    - Ivo
+  unanswerable: false
+
+- id: evening-tide
+  question: What time does the evening high tide arrive, and how many meters does it reach?
+  expected_document: harbor.txt
+  expected_chunk: 1
+  key_facts:
+    - "18:40"
+    - 2.3 meters
+  unanswerable: false
+
+- id: lantern-oil
+  question: How many cans of Wicklow lantern oil are stored in locker B?
+  expected_document: harbor.txt
+  expected_chunk: 2
+  key_facts:
+    - 6 cans
+    - Wicklow
+    - locker B
+  unanswerable: false
+
+- id: storm-flag
+  question: When is the yellow and black storm flag raised?
+  expected_document: harbor.txt
+  expected_chunk: 3
+  key_facts:
+    - yellow and black
+    - 25 knots
+  unanswerable: false
+
+- id: lathe-serial
+  question: What is the workshop lathe serial?
+  expected_document: workshop.docx
+  expected_chunk: 0
+  key_facts:
+    - WL-208
+    - drawer 3
+  unanswerable: false
+
+- id: oak-planks
+  question: How many select grade oak boards are in inventory, and how many meters long is each?
+  expected_document: workshop.docx
+  expected_chunk: 1
+  key_facts:
+    - 14 boards
+    - 2.4 meters
+  unanswerable: false
+
+- id: grinder-safety
+  question: What must a person wear while the orange grinder is running?
+  expected_document: workshop.docx
+  expected_chunk: 2
+  key_facts:
+    - Goggles
+  unanswerable: false
+
+- id: amber-mix
+  question: How many parts of linseed oil and turpentine are in the Amber mix?
+  expected_document: workshop.docx
+  expected_chunk: 3
+  key_facts:
+    - 2 parts linseed oil
+    - 1 part turpentine
+  unanswerable: false
+
+- id: soil-ph
+  question: What soil pH did the Fern kit measure on the north plot?
+  expected_document: field-notes.pdf
+  expected_chunk: 0
+  key_facts:
+    - "6.4"
+    - Fern kit
+  unanswerable: false
+
+- id: valve-leak
+  question: How fast does irrigation valve V7 leak?
+  expected_document: field-notes.pdf
+  expected_chunk: 1
+  key_facts:
+    - one drip per second
+  unanswerable: false
+
+- id: scarecrow
+  question: Which direction does the scarecrow in the green coat face?
+  expected_document: field-notes.pdf
+  expected_chunk: 2
+  key_facts:
+    - green coat
+    - east
+  unanswerable: false
+
+- id: rain-gauge
+  question: What did the rain gauge read on the first of June?
+  expected_document: field-notes.pdf
+  expected_chunk: 3
+  key_facts:
+    - 11 millimeters
+  unanswerable: false
+
+- id: soil-sour
+  question: How sour is the northern ground?
+  expected_document: field-notes.pdf
+  expected_chunk: 0
+  key_facts:
+    - "6.4"
+  unanswerable: false
+
+- id: grinding-eyes
+  question: What should cover your eyes near the bright grinding tool?
+  expected_document: workshop.docx
+  expected_chunk: 2
+  key_facts:
+    - Goggles
+  unanswerable: false
+
+- id: spare-strap
+  question: Where is the extra strap for the spinning machine?
+  expected_document: workshop.docx
+  expected_chunk: 0
+  key_facts:
+    - drawer 3
+  unanswerable: false
+
+- id: wind-banner
+  question: What colors are on the banner shown when the air moves too fast?
+  expected_document: harbor.txt
+  expected_chunk: 3
+  key_facts:
+    - yellow and black
+  unanswerable: false
+
+- id: apple-price
+  question: What price is listed for a piece of fruit?
+  unanswerable: true
+
+- id: lighthouse-owner
+  question: Who owns the lighthouse?
+  unanswerable: true
+
+- id: workshop-password
+  question: What is the wireless password?
+  unanswerable: true
+
+- id: author-birthday
+  question: When was the notebook author born?
+  unanswerable: true
+
+- id: cider-staff
+  question: How many employees work for the pressing company?
+  unanswerable: true
+
+- id: boat-insurance
+  question: What insurance policy number is on file?
+  unanswerable: true
+
+- id: orchard-city
+  question: In which city is the fruit garden located?
+  unanswerable: true
+
+- id: lathe-cord
+  question: What color is the machine power cord?
+  unanswerable: true
