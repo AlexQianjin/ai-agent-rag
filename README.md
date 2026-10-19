@@ -4,7 +4,7 @@ ai-agent-rag is a monorepo for question answering with retrieval-augmented gener
 
 ## Tech stack
 
-The list below is the planned stack. The repository currently contains the workspace, a Vite React app, a Hono service that hosts Better Auth, and a FastAPI service that stores accounts and converted documents in PostgreSQL. Converted Markdown is chunked, embedded with BGE-M3 through Ollama, and stored in Qdrant. The answering agent is not implemented yet.
+The list below is the planned stack. The repository currently contains the workspace, a Vite React app, a Hono service that hosts Better Auth, and a FastAPI service that stores accounts, converted documents, and chat threads in PostgreSQL. Converted Markdown is chunked, embedded with BGE-M3 through Ollama, and stored in Qdrant beside a BM25 sparse vector. A LangGraph agent answers from those passages with Grok, through the xAI API. mem0 is not connected yet. The graph has a recall step that returns nothing until it is.
 
 ### Frontend
 
@@ -37,11 +37,11 @@ The list below is the planned stack. The repository currently contains the works
 ### AI agent
 
 - LangGraph
-- mem0
+- mem0 (the recall step is reserved for it)
 - Qdrant
 - Ollama
 - BGE-M3
-- A local LLM that follows the OpenAI API
+- Grok, through the xAI API (`https://api.x.ai/v1`)
 
 ## Project structure
 
@@ -150,7 +150,7 @@ ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='a-long-password' pnpm --filter auth 
 pnpm dev
 ```
 
-`pnpm dev` and `pnpm dev:frontend` both start the Vite dev server at http://localhost:5173. Sign up at `/signup`, log in at `/login`, and log out at `/logout`. `/users` lists accounts for an admin. `/documents` uploads a file and shows the Markdown preview.
+`pnpm dev` and `pnpm dev:frontend` both start the Vite dev server at http://localhost:5173. Sign up at `/signup`, log in at `/login`, and log out at `/logout`. `/users` lists accounts for an admin. `/documents` uploads a file and shows the Markdown preview. `/chat` is the conversation list and the streamed answer.
 
 ### Run the backend
 
@@ -180,7 +180,7 @@ uv run uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 
 Signed-in users upload a PDF, DOCX, TXT, or Markdown file to `POST /documents`. The file has to be 20 MB or smaller. Anything else is rejected with a short error. TXT and Markdown are read as UTF-8. PDF and DOCX go through [Docling](https://github.com/docling-project/docling). Conversion runs in the background. `GET /documents` lists the caller's files, and `GET /documents/{id}` returns the status and, when it is `ready`, the Markdown. Status moves from `pending` to `processing`, then `ready` or `failed`.
 
-The row lives in the `document` table (`owner_user_id`, filename, mime type, conversion status, indexing status, Markdown, timestamps). Alembic creates it. When a document is ready, the API calls `schedule_indexing`. That chunks the Markdown, embeds the chunks, and upserts them into Qdrant. `index_status` moves through `pending`, `indexing`, and then `indexed` or `failed`. `DELETE /documents/{id}` removes the row and that document's vectors.
+The row lives in the `document` table (`owner_user_id`, filename, mime type, conversion status, indexing status, Markdown, timestamps). An optional `conversation_id` records which chat uploaded the file, so that chat can show indexing progress. Alembic creates the table. When a document is ready, the API calls `schedule_indexing`. That chunks the Markdown, embeds the chunks, and upserts a dense vector and a BM25 sparse vector into Qdrant. `index_status` moves through `pending`, `indexing`, and then `indexed` or `failed`. `DELETE /documents/{id}` removes the row and that document's vectors.
 
 The first PDF conversion on a machine without cached weights downloads Docling's layout and table models. To do that ahead of time:
 
@@ -192,7 +192,15 @@ Leave `DOCLING_ARTIFACTS_PATH` set when you start the API. OCR is off, so a scan
 
 ### Search your documents
 
-`POST /search` takes a JSON body, `{"query": "...", "top_k": 5}`, and returns the nearest chunks for the signed-in user. It embeds the query with the same model and does not call an answering LLM. Another user's chunks are filtered out. `top_k` defaults to 5 and cannot be higher than 20.
+`POST /search` takes a JSON body, `{"query": "...", "top_k": 5}`, and returns the nearest chunks for the signed-in user. It embeds the query with BGE-M3, runs a BM25 query over the same chunks, and fuses the two rankings with reciprocal rank fusion. It does not call an answering LLM. Another user's chunks are filtered out of both searches. `top_k` defaults to 5 and cannot be higher than 20.
+
+BM25 lives in Qdrant, not in Postgres and not in an in-process index. The collection has a sparse vector named `bm25` with the IDF modifier, and the Qdrant server turns chunk text into that vector with its `Qdrant/bm25` model. The same model scores the query. The owner filter is part of both searches, so the fusion step never sees another user's passages, and the sparse index scales with the collection instead of loading every chunk into the API process. Postgres full-text ranking is not BM25, and a second copy of the text would drift from the vectors. Qdrant 1.15 cannot add a sparse vector to a collection that was created with only a dense vector, so the first hybrid startup replaces that collection and reindexes from the stored Markdown. Set `HYBRID_BACKFILL=1`, or run:
+
+```bash
+uv run --directory apps/backend python -m backend.reindex
+```
+
+Compose turns the backfill on. A local API leaves it off unless you set the variable.
 
 Chunking reads the stored Markdown. A heading stays with the text under it. Each chunk aims for about 480 tokens, repeats a short tail from the previous window, and stays under 1024 tokens, inside BGE-M3's 8192-token limit. Docling's HybridChunker wants a Docling document and a Hugging Face tokenizer; the file we keep is Markdown, so the chunker works on that text.
 
@@ -219,6 +227,48 @@ ollama pull bge-m3
 
 Qdrant can be the Compose service, or any server at `QDRANT_URL`. The documents page shows the indexing status and a search box for signed-in users.
 
+### Chat
+
+`/chat` lists the signed-in user's conversations. Creating one, opening one, renaming it, and deleting it are all limited to the owner. Deleting a conversation removes its messages. A document uploaded from that chat stays in the library, and the link on the document is cleared.
+
+Search from a chat covers every indexed document the user owns, not only the files attached to that thread. A question often depends on something uploaded earlier, on the documents page or in another chat. The chat still records which files were uploaded there so it can show `pending`, `indexing`, or `indexed` while Docling and the embedding step run.
+
+`POST /conversations/{id}/messages` accepts `{"content": "..."}` and answers with server-sent events. The browser uses `fetch` so the session cookie is sent. The events are:
+
+```text
+event: thinking
+data: {"status": "Thinking…"}
+
+event: searching
+data: {"status": "Searching documents…"}
+
+event: retrieved
+data: {"status": "Found 2 passages", "sources": [{"document_name": "notes.txt", "chunk_index": 0, "text": "...", "headings": [], "score": 0.03, "document_id": "..."}]}
+
+event: token
+data: {"delta": "The apple "}
+
+event: done
+data: {"message_id": "...", "content": "...", "citations": []}
+
+event: error
+data: {"message": "..."}
+```
+
+The user message is stored before the stream starts. The assistant message, including those citations, is stored when the run finishes. The answer is asked to cite passages as `[1]`, `[2]`, and each source names the document and the chunk. nginx proxies `/api/conversations` with `proxy_buffering off` so those tokens are not held back. The Vite dev proxy leaves the stream open as well.
+
+The model is [Grok](https://docs.x.ai/overview) on the OpenAI-compatible endpoint `https://api.x.ai/v1`. The default model id is `grok-4.7`. Configure it with:
+
+```text
+XAI_API_KEY=
+LLM_BASE_URL=https://api.x.ai/v1
+LLM_MODEL=grok-4.7
+```
+
+Leave the key out of git. The placeholder in `.env.example` is commented out. Without a key the stream returns an error event and does not call xAI.
+
+The graph is three steps: recall, retrieve, answer. Recall is where mem0 will plug in. It returns no memories today, and the answer step already reads that list when it is present.
+
 ### Other scripts
 
 ```bash
@@ -231,7 +281,7 @@ pnpm preview   # serve the frontend production build
 
 ## Deployment
 
-Docker Compose runs the frontend, the auth service, the API, Qdrant, and, with the `ollama` profile, Ollama. The frontend image builds the Vite app, then nginx serves the static files, falls back to `index.html` for client-side routes, and proxies `/api/auth/` to the auth container. It also proxies `/me` and `/health` to the API, so the browser session stays on port 8080. The auth image installs the workspace package and applies the Better Auth schema on startup. The backend image installs the locked dependencies with uv, including the CPU build of PyTorch, downloads the Docling layout models, and runs FastAPI under uvicorn on `0.0.0.0:8000`. nginx also proxies `/api/documents` and `/api/search` to the API and accepts uploads up to 20 MB.
+Docker Compose runs the frontend, the auth service, the API, Qdrant, and, with the `ollama` profile, Ollama. The frontend image builds the Vite app, then nginx serves the static files, falls back to `index.html` for client-side routes, and proxies `/api/auth/` to the auth container. It also proxies `/me` and `/health` to the API, so the browser session stays on port 8080. The auth image installs the workspace package and applies the Better Auth schema on startup. The backend image installs the locked dependencies with uv, including the CPU build of PyTorch, downloads the Docling layout models, and runs FastAPI under uvicorn on `0.0.0.0:8000`. nginx also proxies `/api/documents`, `/api/search`, and `/api/conversations` to the API, accepts uploads up to 20 MB, and turns proxy buffering off for conversation streams.
 
 Compose does not start PostgreSQL. Both services use `DATABASE_URL`, usually the Supabase session pooler. Compose reads that variable, and `BETTER_AUTH_SECRET`, from the shell or from the `.env` file next to `docker-compose.yml`. An exported value overrides the file. Inside Compose, the public auth origin is `http://localhost:8080` and FastAPI calls the auth service at `http://auth:3001`. Qdrant listens on port 6333. The `ollama` profile starts Ollama on port 11434 and a one-shot container pulls `bge-m3` into a persisted volume. The API waits for that pull when the profile is enabled. CPU is the default. GPU support is optional: uncomment the NVIDIA `deploy` block on the `ollama` service if the machine has a GPU.
 
@@ -242,6 +292,8 @@ EMBEDDING_BASE_URL=http://host.docker.internal:11434
 ```
 
 `host.docker.internal` is mapped on the backend service. Pull `bge-m3` on that host Ollama yourself. An exported `EMBEDDING_BASE_URL` or `QDRANT_URL` replaces the Compose default.
+
+The API container receives `XAI_API_KEY`, `LLM_BASE_URL`, and `LLM_MODEL` from the shell or from `.env`. The defaults are `https://api.x.ai/v1` and `grok-4.7`. `HYBRID_BACKFILL` defaults to on inside Compose, so the first start rebuilds a dense-only Qdrant collection and reindexes stored Markdown in the background. Later starts leave documents that are already on the hybrid index alone.
 
 | File | Purpose |
 | --- | --- |

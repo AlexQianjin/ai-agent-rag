@@ -21,6 +21,14 @@ export function searchApiUrl(): string {
   return "/api/search";
 }
 
+/** Conversation routes. Same-origin pages use `/api/conversations` so the SPA can own `/chat`. */
+export function conversationsApiUrl(path = ""): string {
+  if (apiBaseUrl) {
+    return `${apiBaseUrl}/conversations${path}`;
+  }
+  return `/api/conversations${path}`;
+}
+
 export const authClient = createAuthClient({
   baseURL: authBaseUrl,
   plugins: [adminClient()],

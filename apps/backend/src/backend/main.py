@@ -1,5 +1,7 @@
 """FastAPI application entrypoint."""
 
+import threading
+from contextlib import asynccontextmanager
 from typing import Annotated
 
 import uvicorn
@@ -10,14 +12,26 @@ from sqlalchemy.orm import Session
 
 from backend.auth import AuthenticatedUser, CurrentUser
 from backend.config import get_settings
+from backend.conversations import router as conversations_router
 from backend.db import get_db
 from backend.documents import router as documents_router
+from backend.indexing import backfill_hybrid_index
 from backend.search import router as search_router
 
 settings = get_settings()
-app = FastAPI(title="ai-agent-rag", version="0.1.0")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    del app
+    threading.Thread(target=backfill_hybrid_index, name="hybrid-backfill", daemon=True).start()
+    yield
+
+
+app = FastAPI(title="ai-agent-rag", version="0.1.0", lifespan=lifespan)
 app.include_router(documents_router)
 app.include_router(search_router)
+app.include_router(conversations_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,

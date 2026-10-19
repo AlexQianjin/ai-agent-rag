@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     embedding_retries: int = Field(default=3, ge=1, le=8)
     qdrant_url: str = "http://127.0.0.1:6333"
     qdrant_collection: str = "documents"
+    xai_api_key: str = ""
+    llm_base_url: str = "https://api.x.ai/v1"
+    llm_model: str = "grok-4.7"
+    llm_timeout_seconds: float = Field(default=120, gt=0)
+    retrieval_top_k: int = Field(default=5, ge=1, le=20)
+    hybrid_backfill: bool = False
 
     @property
     def cors_origin_list(self) -> list[str]:

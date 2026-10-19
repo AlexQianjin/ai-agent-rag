@@ -9,12 +9,18 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
+from sqlalchemy import or_, select
+
 from backend.chunking import chunk_markdown
 from backend.config import get_settings
 from backend.db import SessionLocal
 from backend.embeddings import EmbeddingError
 from backend.models import Document
 from backend.vector_store import VectorStoreError
+
+# Dense-only points from the earlier index are version 1, implicitly.
+# Version 2 stores a BM25 sparse vector beside the dense vector.
+HYBRID_INDEX_VERSION = 2
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +90,7 @@ def _mark_indexed(document_id: str) -> None:
             return
         document.index_status = "indexed"
         document.index_error = None
+        document.index_version = HYBRID_INDEX_VERSION
         document.updated_at = datetime.now(timezone.utc)
         db.commit()
     finally:
@@ -102,3 +109,36 @@ def _mark_index_failed(document_id: str, message: str) -> None:
         db.commit()
     finally:
         db.close()
+
+
+def backfill_hybrid_index(*, force: bool = False) -> None:
+    """Reindex documents whose vectors predate BM25.
+
+    Qdrant 1.15 cannot add a sparse vector in place, so a dense-only collection
+    is replaced first. Documents already stored at the hybrid version are left
+    alone unless that replacement dropped their points.
+    """
+    settings = get_settings()
+    if not force and not settings.hybrid_backfill:
+        return
+    from backend.vector_store import VectorStore
+
+    try:
+        rebuilt = VectorStore.from_settings(settings).migrate_to_hybrid()
+    except Exception:
+        logger.exception("Could not prepare the hybrid collection")
+        return
+    db = SessionLocal()
+    try:
+        query = select(Document).where(Document.status == "ready", Document.markdown.is_not(None))
+        if not rebuilt:
+            query = query.where(
+                or_(Document.index_version.is_(None), Document.index_version < HYBRID_INDEX_VERSION)
+            )
+        ids = [row.id for row in db.scalars(query).all()]
+    finally:
+        db.close()
+    if ids:
+        logger.info("Reindexing %s document(s) for hybrid search", len(ids))
+    for document_id in ids:
+        index_document(document_id)
