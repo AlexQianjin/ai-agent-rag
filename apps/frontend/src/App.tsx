@@ -1,12 +1,24 @@
-function App() {
-  return (
-    <main className="flex min-h-svh items-center justify-center bg-zinc-950 text-zinc-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-semibold tracking-tight">ai-agent-rag</h1>
-        <p className="mt-3 text-zinc-400">Q&A with RAG</p>
-      </div>
-    </main>
-  )
-}
+import { BrowserRouter, Route, Routes } from "react-router";
 
-export default App
+import { Layout } from "./components/Layout";
+import { HomePage } from "./pages/HomePage";
+import { LoginPage } from "./pages/LoginPage";
+import { LogoutPage } from "./pages/LogoutPage";
+import { SignUpPage } from "./pages/SignUpPage";
+import { UsersPage } from "./pages/UsersPage";
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route index element={<HomePage />} />
+          <Route path="signup" element={<SignUpPage />} />
+          <Route path="login" element={<LoginPage />} />
+          <Route path="logout" element={<LogoutPage />} />
+          <Route path="users" element={<UsersPage />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+}

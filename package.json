@@ -6,10 +6,15 @@
   "engines": {
     "node": ">=22"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  },
   "scripts": {
     "dev": "pnpm dev:frontend",
     "dev:frontend": "pnpm --filter frontend dev",
     "dev:backend": "pnpm --filter backend dev",
+    "dev:auth": "pnpm --filter auth dev",
+    "migrate:auth": "pnpm --filter auth migrate",
     "build": "pnpm --filter frontend build",
     "lint": "pnpm --filter frontend lint",
     "preview": "pnpm --filter frontend preview"
