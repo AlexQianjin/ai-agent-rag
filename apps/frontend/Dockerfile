@@ -4,7 +4,11 @@ FROM node:22-bookworm-slim AS build
 
 WORKDIR /app
 
-ENV CI=true \
+ARG VITE_AUTH_URL=http://localhost:8080
+ARG VITE_API_URL=
+ENV VITE_AUTH_URL=$VITE_AUTH_URL \
+    VITE_API_URL=$VITE_API_URL \
+    CI=true \
     COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 
 RUN corepack enable && corepack prepare pnpm@10.33.4 --activate
@@ -13,6 +17,7 @@ RUN corepack enable && corepack prepare pnpm@10.33.4 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/frontend/package.json apps/frontend/package.json
 COPY apps/backend/package.json apps/backend/package.json
+COPY apps/auth/package.json apps/auth/package.json
 
 RUN pnpm install --frozen-lockfile
 

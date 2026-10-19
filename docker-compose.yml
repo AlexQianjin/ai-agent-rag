@@ -1,4 +1,30 @@
 services:
+  auth:
+    build:
+      context: .
+      dockerfile: apps/auth/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      # The browser reaches Better Auth through the frontend origin.
+      BETTER_AUTH_URL: ${COMPOSE_BETTER_AUTH_URL:-http://localhost:8080}
+      AUTH_TRUSTED_ORIGINS: ${AUTH_TRUSTED_ORIGINS:-http://localhost:5173,http://localhost:8080}
+      PORT: "3001"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
   backend:
     build:
       context: ./apps/backend
@@ -6,6 +32,10 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      AUTH_URL: http://auth:3001
+      CORS_ORIGINS: http://localhost:5173,http://localhost:8080
+    depends_on:
+      - auth
     healthcheck:
       test:
         [
@@ -23,8 +53,14 @@ services:
     build:
       context: .
       dockerfile: apps/frontend/Dockerfile
+      args:
+        VITE_AUTH_URL: ${VITE_AUTH_URL:-http://localhost:8080}
+        VITE_API_URL: ${VITE_API_URL:-}
     ports:
       - "8080:80"
+    depends_on:
+      - auth
+      - backend
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
       interval: 5s
