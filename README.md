@@ -4,7 +4,7 @@ ai-agent-rag is a monorepo for question answering with retrieval-augmented gener
 
 ## Tech stack
 
-The list below is the planned stack. The repository currently contains the workspace, a Vite React app, a Hono service that hosts Better Auth, and a FastAPI service that stores accounts and converted documents in PostgreSQL. Chunking, embeddings, and the AI agent are not implemented yet.
+The list below is the planned stack. The repository currently contains the workspace, a Vite React app, a Hono service that hosts Better Auth, and a FastAPI service that stores accounts and converted documents in PostgreSQL. Converted Markdown is chunked, embedded with BGE-M3 through Ollama, and stored in Qdrant. The answering agent is not implemented yet.
 
 ### Frontend
 
@@ -39,6 +39,8 @@ The list below is the planned stack. The repository currently contains the works
 - LangGraph
 - mem0
 - Qdrant
+- Ollama
+- BGE-M3
 - A local LLM that follows the OpenAI API
 
 ## Project structure
@@ -178,7 +180,7 @@ uv run uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 
 Signed-in users upload a PDF, DOCX, TXT, or Markdown file to `POST /documents`. The file has to be 20 MB or smaller. Anything else is rejected with a short error. TXT and Markdown are read as UTF-8. PDF and DOCX go through [Docling](https://github.com/docling-project/docling). Conversion runs in the background. `GET /documents` lists the caller's files, and `GET /documents/{id}` returns the status and, when it is `ready`, the Markdown. Status moves from `pending` to `processing`, then `ready` or `failed`.
 
-The row lives in the `document` table (`owner_user_id`, filename, mime type, status, Markdown, timestamps). Alembic creates it. When a document is ready, the API calls `schedule_indexing`. That function is empty on purpose: chunking, embeddings, and Qdrant belong there later.
+The row lives in the `document` table (`owner_user_id`, filename, mime type, conversion status, indexing status, Markdown, timestamps). Alembic creates it. When a document is ready, the API calls `schedule_indexing`. That chunks the Markdown, embeds the chunks, and upserts them into Qdrant. `index_status` moves through `pending`, `indexing`, and then `indexed` or `failed`. `DELETE /documents/{id}` removes the row and that document's vectors.
 
 The first PDF conversion on a machine without cached weights downloads Docling's layout and table models. To do that ahead of time:
 
@@ -187,6 +189,35 @@ DOCLING_ARTIFACTS_PATH=/path/to/models uv run --directory apps/backend python -m
 ```
 
 Leave `DOCLING_ARTIFACTS_PATH` set when you start the API. OCR is off, so a scanned PDF will not pick up text; a PDF that already has a text layer will. The Docker image installs the CPU build of PyTorch from the official CPU index, which leaves out the CUDA libraries, and downloads the layout and table models while the image builds.
+
+### Search your documents
+
+`POST /search` takes a JSON body, `{"query": "...", "top_k": 5}`, and returns the nearest chunks for the signed-in user. It embeds the query with the same model and does not call an answering LLM. Another user's chunks are filtered out. `top_k` defaults to 5 and cannot be higher than 20.
+
+Chunking reads the stored Markdown. A heading stays with the text under it. Each chunk aims for about 480 tokens, repeats a short tail from the previous window, and stays under 1024 tokens, inside BGE-M3's 8192-token limit. Docling's HybridChunker wants a Docling document and a Hugging Face tokenizer; the file we keep is Markdown, so the chunker works on that text.
+
+Embeddings go to Ollama's native `POST /api/embed`. That endpoint accepts a list of strings and returns the vectors in the same order. The OpenAI-compatible `/v1/embeddings` route is only a shim, and its batching has lagged behind. The client sends batches, times out, and retries failed requests. Configure it with:
+
+```text
+EMBEDDING_BASE_URL=http://127.0.0.1:11434
+EMBEDDING_MODEL=bge-m3
+EMBEDDING_DIMENSION=1024
+```
+
+Those are the defaults, along with a 60 second timeout, batches of 16, and 3 attempts. [bge-m3](https://ollama.com/library/bge-m3) produces 1024-dimensional dense vectors. Qdrant stores them with cosine distance in the `documents` collection, which the API creates if it is missing. Each point's payload is the document id, owner user id, chunk index, text, and headings.
+
+```text
+QDRANT_URL=http://127.0.0.1:6333
+QDRANT_COLLECTION=documents
+```
+
+For local development, run Ollama and pull the model once:
+
+```bash
+ollama pull bge-m3
+```
+
+Qdrant can be the Compose service, or any server at `QDRANT_URL`. The documents page shows the indexing status and a search box for signed-in users.
 
 ### Other scripts
 
@@ -200,9 +231,17 @@ pnpm preview   # serve the frontend production build
 
 ## Deployment
 
-Docker Compose runs the frontend, the auth service, and the API. The frontend image builds the Vite app, then nginx serves the static files, falls back to `index.html` for client-side routes, and proxies `/api/auth/` to the auth container. It also proxies `/me` and `/health` to the API, so the browser session stays on port 8080. The auth image installs the workspace package and applies the Better Auth schema on startup. The backend image installs the locked dependencies with uv, including the CPU build of PyTorch, downloads the Docling layout models, and runs FastAPI under uvicorn on `0.0.0.0:8000`. nginx also proxies `/api/documents` to the API and accepts uploads up to 20 MB.
+Docker Compose runs the frontend, the auth service, the API, Qdrant, and, with the `ollama` profile, Ollama. The frontend image builds the Vite app, then nginx serves the static files, falls back to `index.html` for client-side routes, and proxies `/api/auth/` to the auth container. It also proxies `/me` and `/health` to the API, so the browser session stays on port 8080. The auth image installs the workspace package and applies the Better Auth schema on startup. The backend image installs the locked dependencies with uv, including the CPU build of PyTorch, downloads the Docling layout models, and runs FastAPI under uvicorn on `0.0.0.0:8000`. nginx also proxies `/api/documents` and `/api/search` to the API and accepts uploads up to 20 MB.
 
-Compose does not start PostgreSQL. Both services use `DATABASE_URL`, usually the Supabase session pooler. Compose reads that variable, and `BETTER_AUTH_SECRET`, from the shell or from the `.env` file next to `docker-compose.yml`. An exported value overrides the file. Inside Compose, the public auth origin is `http://localhost:8080` and FastAPI calls the auth service at `http://auth:3001`. Qdrant is still not included.
+Compose does not start PostgreSQL. Both services use `DATABASE_URL`, usually the Supabase session pooler. Compose reads that variable, and `BETTER_AUTH_SECRET`, from the shell or from the `.env` file next to `docker-compose.yml`. An exported value overrides the file. Inside Compose, the public auth origin is `http://localhost:8080` and FastAPI calls the auth service at `http://auth:3001`. Qdrant listens on port 6333. The `ollama` profile starts Ollama on port 11434 and a one-shot container pulls `bge-m3` into a persisted volume. The API waits for that pull when the profile is enabled. CPU is the default. GPU support is optional: uncomment the NVIDIA `deploy` block on the `ollama` service if the machine has a GPU.
+
+To use an Ollama that is already running on the host, leave the profile off and point the API at it:
+
+```text
+EMBEDDING_BASE_URL=http://host.docker.internal:11434
+```
+
+`host.docker.internal` is mapped on the backend service. Pull `bge-m3` on that host Ollama yourself. An exported `EMBEDDING_BASE_URL` or `QDRANT_URL` replaces the Compose default.
 
 | File | Purpose |
 | --- | --- |
@@ -212,7 +251,7 @@ Compose does not start PostgreSQL. Both services use `DATABASE_URL`, usually the
 | `apps/backend/Dockerfile` | FastAPI image built with uv 0.13.1. |
 | `apps/backend/.dockerignore` | Files left out of the backend build context. |
 | `.dockerignore` | Files left out of the frontend build context. |
-| `docker-compose.yml` | Builds and runs the frontend, auth service, and API. |
+| `docker-compose.yml` | Builds and runs the frontend, auth service, API, and Qdrant. The `ollama` profile adds Ollama and the `bge-m3` pull. |
 
 ### Prerequisites
 
@@ -223,10 +262,12 @@ Docker Engine with the Compose plugin.
 From the repository root:
 
 ```bash
-docker compose build
-docker compose run --rm backend alembic upgrade head
-docker compose up
+docker compose --profile ollama build
+docker compose --profile ollama run --rm backend alembic upgrade head
+docker compose --profile ollama up
 ```
+
+The first start downloads `bge-m3` before the API container is marked ready. Later starts reuse the `ollama_data` volume. Without the profile, Compose still starts Qdrant and the API uses `EMBEDDING_BASE_URL` if you set it.
 
 The auth container applies its schema when it starts, so you do not run `pnpm migrate:auth` again for Compose.
 
@@ -234,6 +275,8 @@ The auth container applies its schema when it starts, so you do not run `pnpm mi
 - Auth health: http://localhost:3001/health
 - Backend: http://localhost:8000/health
 - Database check: http://localhost:8000/health/db
+- Qdrant: http://localhost:6333
+- Ollama, with the profile: http://localhost:11434
 
 The health endpoints return `{"status":"ok"}`. Sign-in from the published frontend uses `/api/auth` on port 8080.
 
