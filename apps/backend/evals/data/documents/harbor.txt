@@ -1,0 +1,15 @@
+# Pellucid
+
+The blue fishing boat Pellucid is moored at pier 4. Its captain is Ivo.
+
+# Evening tide
+
+The evening high tide arrives at 18:40 and reaches 2.3 meters.
+
+# Lantern locker
+
+Lantern oil is stored in locker B. There are 6 cans of the brand Wicklow.
+
+# Storm flag
+
+The storm flag is yellow and black. The harbor raises it when the wind exceeds 25 knots.

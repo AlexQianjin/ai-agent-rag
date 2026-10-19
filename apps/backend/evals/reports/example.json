@@ -1,0 +1,148 @@
+{
+  "created_at": "2026-01-01T00:00:00Z",
+  "mode": "full",
+  "k": 5,
+  "answerable_count": 2,
+  "unanswerable_count": 1,
+  "metrics": {
+    "dense": {
+      "hit_rate": 0.5,
+      "recall_at_k": 0.5,
+      "mrr": 0.5,
+      "ndcg_at_k": 0.5,
+      "count": 2
+    },
+    "bm25": {
+      "hit_rate": 1.0,
+      "recall_at_k": 1.0,
+      "mrr": 0.75,
+      "ndcg_at_k": 0.815,
+      "count": 2
+    },
+    "hybrid": {
+      "hit_rate": 1.0,
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 1.0,
+      "count": 2
+    },
+    "answer": {
+      "faithfulness": 1.0,
+      "relevance": 0.85,
+      "citation_accuracy": 0.5,
+      "refusal_correctness": 1.0,
+      "mean_answer_latency_ms": 420.0,
+      "mean_judge_latency_ms": 310.0,
+      "answer_prompt_tokens": 900,
+      "answer_completion_tokens": 120,
+      "judge_prompt_tokens": 1100,
+      "judge_completion_tokens": 80
+    }
+  },
+  "thresholds": {
+    "k": 5,
+    "retrieval": {
+      "hybrid": {
+        "hit_rate": 0.75,
+        "recall_at_k": 0.75,
+        "mrr": 0.6,
+        "ndcg_at_k": 0.65
+      }
+    },
+    "answer": {
+      "faithfulness": 0.7,
+      "relevance": 0.7,
+      "citation_accuracy": 0.7,
+      "refusal_correctness": 0.75
+    }
+  },
+  "threshold_failures": [
+    "answer citation_accuracy 0.500 is below 0.700"
+  ],
+  "passed": false,
+  "cases": [
+    {
+      "id": "apple-variety",
+      "question": "What variety is the crimson apple?",
+      "unanswerable": false,
+      "expected_document": "orchard.txt",
+      "expected_chunk": 0,
+      "key_facts": ["Lumen"],
+      "dense_rank": 1,
+      "bm25_rank": 2,
+      "hybrid_rank": 1,
+      "dense_hit": true,
+      "bm25_hit": true,
+      "hybrid_hit": true,
+      "retrieval_latency_ms": 40.0,
+      "answer": "The variety is Lumen [1].",
+      "citation_correct": true,
+      "faithfulness": 1.0,
+      "relevance": 1.0,
+      "refused": false,
+      "refusal_correct": true,
+      "notes": "The answer matches the passage.",
+      "answer_latency_ms": 400.0,
+      "judge_latency_ms": 300.0,
+      "answer_tokens": {"prompt_tokens": 300, "completion_tokens": 40, "total_tokens": 340},
+      "judge_tokens": {"prompt_tokens": 360, "completion_tokens": 20, "total_tokens": 380},
+      "failure_reasons": []
+    },
+    {
+      "id": "shed-code",
+      "question": "What is the orchard shed gate code?",
+      "unanswerable": false,
+      "expected_document": "orchard.txt",
+      "expected_chunk": 3,
+      "key_facts": ["4417"],
+      "dense_rank": null,
+      "bm25_rank": 1,
+      "hybrid_rank": 1,
+      "dense_hit": false,
+      "bm25_hit": true,
+      "hybrid_hit": true,
+      "retrieval_latency_ms": 35.0,
+      "answer": "The code is 4417 [2].",
+      "citation_correct": false,
+      "faithfulness": 1.0,
+      "relevance": 1.0,
+      "refused": false,
+      "refusal_correct": true,
+      "notes": "Cited the wrong chunk.",
+      "answer_latency_ms": 440.0,
+      "judge_latency_ms": 320.0,
+      "answer_tokens": {"prompt_tokens": 300, "completion_tokens": 40, "total_tokens": 340},
+      "judge_tokens": {"prompt_tokens": 370, "completion_tokens": 30, "total_tokens": 400},
+      "failure_reasons": [
+        "the cited document and chunk do not match the expected source"
+      ]
+    },
+    {
+      "id": "lighthouse-owner",
+      "question": "Who owns the lighthouse?",
+      "unanswerable": true,
+      "expected_document": null,
+      "expected_chunk": null,
+      "key_facts": [],
+      "dense_rank": null,
+      "bm25_rank": null,
+      "hybrid_rank": null,
+      "dense_hit": null,
+      "bm25_hit": null,
+      "hybrid_hit": null,
+      "retrieval_latency_ms": null,
+      "answer": "The passages do not say who owns the lighthouse.",
+      "citation_correct": null,
+      "faithfulness": 1.0,
+      "relevance": 1.0,
+      "refused": true,
+      "refusal_correct": true,
+      "notes": "Refusal matches the passages.",
+      "answer_latency_ms": 420.0,
+      "judge_latency_ms": 310.0,
+      "answer_tokens": {"prompt_tokens": 300, "completion_tokens": 40, "total_tokens": 340},
+      "judge_tokens": {"prompt_tokens": 370, "completion_tokens": 30, "total_tokens": 400},
+      "failure_reasons": []
+    }
+  ]
+}

@@ -197,6 +197,38 @@ class VectorStore:
                 hits.append(hit)
         return hits
 
+    def search_dense(self, *, vector: list[float], owner_user_id: str, top_k: int) -> list[SearchHit]:
+        """Rank one user's chunks by the dense vector only."""
+        if not self.client.collection_exists(self.collection):
+            self._create_hybrid()
+        if not self._is_hybrid():
+            return self._dense_hits(vector, owner_user_id, top_k)
+        self._check_dimension()
+        response = self.client.query_points(
+            collection_name=self.collection,
+            query=vector,
+            using=DENSE_NAME,
+            query_filter=owner_filter(owner_user_id),
+            limit=top_k,
+            with_payload=True,
+        )
+        return _hits_from_response(response.points, owner_user_id)
+
+    def search_bm25(self, *, query: str, owner_user_id: str, top_k: int) -> list[SearchHit]:
+        """Rank one user's chunks by the BM25 sparse vector only."""
+        if not self.client.collection_exists(self.collection) or not self._is_hybrid():
+            raise VectorStoreError("BM25 search needs the hybrid collection.")
+        self._check_dimension()
+        response = self.client.query_points(
+            collection_name=self.collection,
+            query=Bm25Document(text=query, model=BM25_MODEL),
+            using=BM25_NAME,
+            query_filter=owner_filter(owner_user_id),
+            limit=top_k,
+            with_payload=True,
+        )
+        return _hits_from_response(response.points, owner_user_id)
+
     def _dense_hits(self, vector: list[float], owner_user_id: str, top_k: int) -> list[SearchHit]:
         """Search a collection that has not been rebuilt with BM25 yet."""
         response = self.client.query_points(
@@ -206,12 +238,7 @@ class VectorStore:
             limit=top_k,
             with_payload=True,
         )
-        hits: list[SearchHit] = []
-        for point in _owned_points(response.points, owner_user_id):
-            hit = _hit_from_point(point, float(point.score or 0))
-            if hit is not None:
-                hits.append(hit)
-        return hits
+        return _hits_from_response(response.points, owner_user_id)
 
     def _create_hybrid(self) -> None:
         self.client.create_collection(
@@ -247,6 +274,15 @@ class VectorStore:
             raise VectorStoreError(
                 f"Collection {self.collection} has dimension {size}, expected {self.dimension}."
             )
+
+
+def _hits_from_response(points: list, owner_user_id: str) -> list[SearchHit]:
+    hits: list[SearchHit] = []
+    for point in _owned_points(points, owner_user_id):
+        hit = _hit_from_point(point, float(point.score or 0))
+        if hit is not None:
+            hits.append(hit)
+    return hits
 
 
 def _owned_points(points: list, owner_user_id: str) -> list:

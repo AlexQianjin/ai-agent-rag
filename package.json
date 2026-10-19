@@ -17,6 +17,8 @@
     "migrate:auth": "pnpm --filter auth migrate",
     "build": "pnpm --filter frontend build",
     "lint": "pnpm --filter frontend lint",
-    "preview": "pnpm --filter frontend preview"
+    "preview": "pnpm --filter frontend preview",
+    "eval": "pnpm --filter backend eval",
+    "eval:retrieval": "pnpm --filter backend eval:retrieval"
   }
 }
