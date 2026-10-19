@@ -22,7 +22,7 @@ export function HomePage() {
     <div className="max-w-xl">
       <h1 className="text-3xl font-semibold tracking-tight">Q&A with RAG</h1>
       <p className="mt-3 text-zinc-400">
-        Sign in to upload a PDF, Word, text, or Markdown file. Docling turns the office files into Markdown.
+        Sign in to upload a file and ask questions in chat. Docling converts office files, and the assistant answers from your documents.
       </p>
       {isPending ? <p className="mt-6 text-sm text-zinc-400">Checking your session…</p> : null}
       {session ? (
@@ -35,6 +35,9 @@ export function HomePage() {
             {me.isLoading ? "checking…" : me.isError ? "not accepted" : (me.data?.role ?? "user")}
           </p>
           <div className="flex gap-4">
+            <Link to="/chat" className="text-zinc-100 underline">
+              Open chat
+            </Link>
             <Link to="/documents" className="text-zinc-100 underline">
               Convert a document
             </Link>

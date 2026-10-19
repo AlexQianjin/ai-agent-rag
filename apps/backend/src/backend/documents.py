@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
-from pydantic import BaseModel
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -19,7 +19,7 @@ from backend.config import get_settings
 from backend.conversion import DocumentRejected, convert_to_markdown, validate_upload
 from backend.db import SessionLocal, get_db
 from backend.indexing import schedule_indexing
-from backend.models import Document
+from backend.models import Conversation, Document
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +29,8 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 
 class DocumentSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     filename: str
     mime_type: str
@@ -36,6 +38,7 @@ class DocumentSummary(BaseModel):
     index_status: str | None
     error_message: str | None
     index_error: str | None
+    conversation_id: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -49,17 +52,7 @@ class DocumentList(BaseModel):
 
 
 def _summary(document: Document) -> DocumentSummary:
-    return DocumentSummary(
-        id=document.id,
-        filename=document.filename,
-        mime_type=document.mime_type,
-        status=document.status,
-        index_status=document.index_status,
-        error_message=document.error_message,
-        index_error=document.index_error,
-        created_at=document.created_at,
-        updated_at=document.updated_at,
-    )
+    return DocumentSummary.model_validate(document)
 
 
 def _owned(db: Session, document_id: str, user_id: str) -> Document:
@@ -140,12 +133,22 @@ async def create_document(
     user: CurrentUser,
     db: DbSession,
     file: Annotated[UploadFile, File(...)],
+    conversation_id: Annotated[str | None, Form()] = None,
 ) -> DocumentSummary:
-    """Accept a file, store a pending row, and convert it in the background."""
+    """Accept a file, store a pending row, and convert it in the background.
+
+    `conversation_id` links the file to a chat so that chat can show indexing
+    progress. Search still covers every indexed document the user owns.
+    """
     settings = get_settings()
     filename = Path(file.filename or "").name
     if not filename:
         raise HTTPException(status_code=400, detail="The file needs a name.")
+    linked = (conversation_id or "").strip() or None
+    if linked is not None:
+        conversation = db.get(Conversation, linked)
+        if conversation is None or conversation.owner_user_id != user.id:
+            raise HTTPException(status_code=404, detail="Conversation not found")
     payload = await file.read(settings.max_upload_bytes + 1)
     try:
         mime_type = validate_upload(filename, len(payload), limit=settings.max_upload_bytes)
@@ -155,6 +158,7 @@ async def create_document(
     document = Document(
         id=str(uuid4()),
         owner_user_id=user.id,
+        conversation_id=linked,
         filename=filename,
         mime_type=mime_type,
         status="pending",

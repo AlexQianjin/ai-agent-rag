@@ -154,7 +154,7 @@ export function DocumentsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Documents</h1>
         <p className="mt-2 text-sm text-zinc-400">
           PDF and Word files are converted with Docling. Text and Markdown are stored as they are. Uploads are limited
-          to 20 MB. Ready files are chunked and embedded with BGE-M3 so you can search your own passages.
+          to 20 MB. Ready files are chunked, embedded with BGE-M3, and indexed for hybrid search. Ask about them in chat.
         </p>
       </div>
 

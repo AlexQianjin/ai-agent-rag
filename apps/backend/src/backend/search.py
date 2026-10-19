@@ -1,4 +1,4 @@
-"""Retrieve a user's own chunks. This does not generate an answer."""
+"""Retrieve a user's own chunks with hybrid search. This does not generate an answer."""
 
 from __future__ import annotations
 
@@ -36,14 +36,19 @@ class SearchResponse(BaseModel):
 
 @router.post("/search")
 def search(body: SearchRequest, user: CurrentUser) -> SearchResponse:
-    """Embed the query and return the caller's nearest chunks."""
+    """Embed the query, fuse it with BM25, and return the caller's nearest chunks."""
     query = body.query.strip()
     if not query:
         raise HTTPException(status_code=400, detail="Enter a search query.")
     settings = get_settings()
     try:
         vector = EmbeddingClient.from_settings(settings).embed([query])[0]
-        hits = VectorStore.from_settings(settings).search(vector, user.id, body.top_k)
+        hits = VectorStore.from_settings(settings).hybrid_search(
+            query=query,
+            vector=vector,
+            owner_user_id=user.id,
+            top_k=body.top_k,
+        )
     except (EmbeddingError, VectorStoreError) as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
