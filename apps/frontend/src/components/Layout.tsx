@@ -15,6 +15,7 @@ export function Layout() {
           <nav className="flex items-center gap-4 text-sm text-zinc-300">
             {session ? (
               <>
+                <Link to="/documents">Documents</Link>
                 <Link to="/users">Users</Link>
                 <Link to="/logout">Log out</Link>
               </>

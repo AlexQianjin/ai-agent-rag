@@ -4,7 +4,7 @@ ai-agent-rag is a monorepo for question answering with retrieval-augmented gener
 
 ## Tech stack
 
-The list below is the planned stack. The repository currently contains the workspace, a Vite React app, a Hono service that hosts Better Auth, and a FastAPI service connected to the same PostgreSQL database. The AI agent is not implemented yet, and there are no document tables yet.
+The list below is the planned stack. The repository currently contains the workspace, a Vite React app, a Hono service that hosts Better Auth, and a FastAPI service that stores accounts and converted documents in PostgreSQL. Chunking, embeddings, and the AI agent are not implemented yet.
 
 ### Frontend
 
@@ -26,6 +26,7 @@ The list below is the planned stack. The repository currently contains the works
 
 - Python
 - FastAPI
+- Docling
 - Better Auth
 - Pydantic
 - SQLAlchemy
@@ -131,7 +132,7 @@ That applies the Better Auth schema with the library's migrator: the `user`, `se
 pnpm dev:auth
 ```
 
-Hono listens on http://127.0.0.1:3001. During local development the Vite server proxies `/api/auth` to that process, and `BETTER_AUTH_URL` stays `http://localhost:5173` so the session cookie matches the page. Vite also proxies `/me` and `/health` to FastAPI, so the browser keeps that cookie on one origin. The cookie is tied to the hostname: open the app as `localhost`, because `127.0.0.1` does not share it.
+Hono listens on http://127.0.0.1:3001. During local development the Vite server proxies `/api/auth` to that process, and `BETTER_AUTH_URL` stays `http://localhost:5173` so the session cookie matches the page. Vite also proxies `/me`, `/health`, and `/api/documents` to FastAPI, so the browser keeps that cookie on one origin. The documents page itself stays at `/documents`. The cookie is tied to the hostname: open the app as `localhost`, because `127.0.0.1` does not share it.
 
 Sign-up, sign-in, sign-out, and session live at `/api/auth/*`. User administration uses the Better Auth admin plugin on the same service: list, get, create, update, and delete. Those actions require an admin. A signed-in user without that role is rejected. FastAPI does not write the user tables. `GET /me` on the API forwards the session cookie to Better Auth and returns the current user.
 
@@ -147,7 +148,7 @@ ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='a-long-password' pnpm --filter auth 
 pnpm dev
 ```
 
-`pnpm dev` and `pnpm dev:frontend` both start the Vite dev server at http://localhost:5173. Sign up at `/signup`, log in at `/login`, and log out at `/logout`. `/users` lists accounts for an admin.
+`pnpm dev` and `pnpm dev:frontend` both start the Vite dev server at http://localhost:5173. Sign up at `/signup`, log in at `/login`, and log out at `/logout`. `/users` lists accounts for an admin. `/documents` uploads a file and shows the Markdown preview.
 
 ### Run the backend
 
@@ -173,6 +174,20 @@ uv run uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 
 `GET /me` returns the signed-in user, or `401` when the session cookie is missing. The dev server and the published frontend both expose that path on the page origin. `http://localhost:8000/me` is the same route on the API itself.
 
+### Convert a document
+
+Signed-in users upload a PDF, DOCX, TXT, or Markdown file to `POST /documents`. The file has to be 20 MB or smaller. Anything else is rejected with a short error. TXT and Markdown are read as UTF-8. PDF and DOCX go through [Docling](https://github.com/docling-project/docling). Conversion runs in the background. `GET /documents` lists the caller's files, and `GET /documents/{id}` returns the status and, when it is `ready`, the Markdown. Status moves from `pending` to `processing`, then `ready` or `failed`.
+
+The row lives in the `document` table (`owner_user_id`, filename, mime type, status, Markdown, timestamps). Alembic creates it. When a document is ready, the API calls `schedule_indexing`. That function is empty on purpose: chunking, embeddings, and Qdrant belong there later.
+
+The first PDF conversion on a machine without cached weights downloads Docling's layout and table models. To do that ahead of time:
+
+```bash
+DOCLING_ARTIFACTS_PATH=/path/to/models uv run --directory apps/backend python -m backend.download_models
+```
+
+Leave `DOCLING_ARTIFACTS_PATH` set when you start the API. OCR is off, so a scanned PDF will not pick up text; a PDF that already has a text layer will. The Docker image installs the CPU build of PyTorch from the official CPU index, which leaves out the CUDA libraries, and downloads the layout and table models while the image builds.
+
 ### Other scripts
 
 ```bash
@@ -185,7 +200,7 @@ pnpm preview   # serve the frontend production build
 
 ## Deployment
 
-Docker Compose runs the frontend, the auth service, and the API. The frontend image builds the Vite app, then nginx serves the static files, falls back to `index.html` for client-side routes, and proxies `/api/auth/` to the auth container. It also proxies `/me` and `/health` to the API, so the browser session stays on port 8080. The auth image installs the workspace package and applies the Better Auth schema on startup. The backend image installs the locked dependencies with uv and runs FastAPI under uvicorn on `0.0.0.0:8000`.
+Docker Compose runs the frontend, the auth service, and the API. The frontend image builds the Vite app, then nginx serves the static files, falls back to `index.html` for client-side routes, and proxies `/api/auth/` to the auth container. It also proxies `/me` and `/health` to the API, so the browser session stays on port 8080. The auth image installs the workspace package and applies the Better Auth schema on startup. The backend image installs the locked dependencies with uv, including the CPU build of PyTorch, downloads the Docling layout models, and runs FastAPI under uvicorn on `0.0.0.0:8000`. nginx also proxies `/api/documents` to the API and accepts uploads up to 20 MB.
 
 Compose does not start PostgreSQL. Both services use `DATABASE_URL`, usually the Supabase session pooler. Compose reads that variable, and `BETTER_AUTH_SECRET`, from the shell or from the `.env` file next to `docker-compose.yml`. An exported value overrides the file. Inside Compose, the public auth origin is `http://localhost:8080` and FastAPI calls the auth service at `http://auth:3001`. Qdrant is still not included.
 

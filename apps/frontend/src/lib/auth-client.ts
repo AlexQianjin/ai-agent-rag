@@ -5,6 +5,14 @@ export const authBaseUrl = import.meta.env.VITE_AUTH_URL ?? "http://localhost:51
 // Empty means the page origin. Vite and nginx proxy these paths to FastAPI.
 export const apiBaseUrl = import.meta.env.VITE_API_URL ?? "";
 
+/** Document routes on the API. Same-origin pages use `/api/documents` so the SPA can own `/documents`. */
+export function documentsApiUrl(path = ""): string {
+  if (apiBaseUrl) {
+    return `${apiBaseUrl}/documents${path}`;
+  }
+  return `/api/documents${path}`;
+}
+
 export const authClient = createAuthClient({
   baseURL: authBaseUrl,
   plugins: [adminClient()],
