@@ -44,6 +44,14 @@ class Settings(BaseSettings):
     auth_url: str = "http://127.0.0.1:3001"
     cors_origins: str = "http://localhost:5173,http://localhost:8080"
     max_upload_bytes: int = Field(default=20 * 1024 * 1024, ge=1)
+    embedding_base_url: str = "http://127.0.0.1:11434"
+    embedding_model: str = "bge-m3"
+    embedding_dimension: int = Field(default=1024, ge=1)
+    embedding_timeout_seconds: float = Field(default=60, gt=0)
+    embedding_batch_size: int = Field(default=16, ge=1, le=128)
+    embedding_retries: int = Field(default=3, ge=1, le=8)
+    qdrant_url: str = "http://127.0.0.1:6333"
+    qdrant_collection: str = "documents"
 
     @property
     def cors_origin_list(self) -> list[str]:

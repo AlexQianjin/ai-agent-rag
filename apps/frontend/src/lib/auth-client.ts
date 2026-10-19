@@ -13,6 +13,14 @@ export function documentsApiUrl(path = ""): string {
   return `/api/documents${path}`;
 }
 
+/** Retrieval route. Same-origin pages use `/api/search` so it is not a page path. */
+export function searchApiUrl(): string {
+  if (apiBaseUrl) {
+    return `${apiBaseUrl}/search`;
+  }
+  return "/api/search";
+}
+
 export const authClient = createAuthClient({
   baseURL: authBaseUrl,
   plugins: [adminClient()],

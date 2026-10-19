@@ -33,7 +33,9 @@ class DocumentSummary(BaseModel):
     filename: str
     mime_type: str
     status: str
+    index_status: str | None
     error_message: str | None
+    index_error: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -52,7 +54,9 @@ def _summary(document: Document) -> DocumentSummary:
         filename=document.filename,
         mime_type=document.mime_type,
         status=document.status,
+        index_status=document.index_status,
         error_message=document.error_message,
+        index_error=document.index_error,
         created_at=document.created_at,
         updated_at=document.updated_at,
     )
@@ -69,7 +73,7 @@ def run_conversion(document_id: str, source_path: str) -> None:
     """Convert one stored upload and record the Markdown.
 
     Runs outside the request session. On success it calls `schedule_indexing`,
-    which is the placeholder for chunking and Qdrant.
+    which chunks the Markdown and writes vectors to Qdrant.
     """
     path = Path(source_path)
     db = SessionLocal()
@@ -93,7 +97,9 @@ def run_conversion(document_id: str, source_path: str) -> None:
             return
         document.markdown = markdown
         document.status = "ready"
+        document.index_status = "pending"
         document.error_message = None
+        document.index_error = None
         document.updated_at = datetime.now(timezone.utc)
         db.commit()
         schedule_indexing(document.id)
@@ -162,3 +168,20 @@ async def create_document(
     source_path.write_bytes(payload)
     background_tasks.add_task(run_conversion, document.id, str(source_path))
     return _summary(document)
+
+
+@router.delete("/documents/{document_id}", status_code=204)
+def delete_document(document_id: str, user: CurrentUser, db: DbSession) -> None:
+    """Delete one document and its vectors."""
+    document = _owned(db, document_id, user.id)
+    try:
+        from backend.vector_store import VectorStore, VectorStoreError
+
+        VectorStore.from_settings(get_settings()).delete_document(document.id)
+    except VectorStoreError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Could not delete vectors for %s", document_id)
+        raise HTTPException(status_code=503, detail="Could not delete the document index.") from exc
+    db.delete(document)
+    db.commit()

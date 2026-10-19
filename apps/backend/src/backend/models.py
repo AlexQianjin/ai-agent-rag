@@ -13,8 +13,8 @@ class Base(DeclarativeBase):
 class Document(Base):
     """A file converted to Markdown for one signed-in user.
 
-    `markdown` holds the conversion result. Chunking and vector search are
-    not stored here; see `backend.indexing`.
+    `markdown` holds the conversion result. `index_status` tracks the later
+    chunk-and-embed step. The vectors themselves live in Qdrant.
     """
 
     __tablename__ = "document"
@@ -24,7 +24,9 @@ class Document(Base):
     filename: Mapped[str] = mapped_column(String(512))
     mime_type: Mapped[str] = mapped_column(String(127))
     status: Mapped[str] = mapped_column(String(32), default="pending")
+    index_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
     markdown: Mapped[str | None] = mapped_column(Text, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    index_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
