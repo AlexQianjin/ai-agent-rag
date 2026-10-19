@@ -17,7 +17,6 @@ from langgraph.graph import END, START, StateGraph
 from sqlalchemy import select
 
 from backend.config import get_settings
-from backend.db import SessionLocal
 from backend.models import Document
 
 
@@ -221,6 +220,8 @@ def prompt_messages(state: AgentState) -> list[dict[str, str]]:
 def _document_names(user_id: str, document_ids: list[str]) -> dict[str, str]:
     if not document_ids:
         return {}
+    from backend.db import SessionLocal
+
     db = SessionLocal()
     try:
         rows = db.scalars(

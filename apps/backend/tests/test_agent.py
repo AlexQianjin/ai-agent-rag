@@ -50,6 +50,8 @@ def test_graph_searches_then_cites_sources() -> None:
 
 def test_missing_api_key_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("XAI_API_KEY", "")
+    # Settings still requires a URL, but this test never opens a connection.
+    monkeypatch.setenv("DATABASE_URL", "postgresql://localhost/unused")
     get_settings.cache_clear()
     try:
         with pytest.raises(AgentError, match="XAI_API_KEY"):

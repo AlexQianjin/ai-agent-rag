@@ -50,7 +50,8 @@ jobs:
             tests/test_chunking.py \
             tests/test_embeddings.py \
             tests/test_conversion.py \
-            tests/test_eval_metrics.py
+            tests/test_eval_metrics.py \
+            tests/test_db_import.py
 
       - name: Retrieval eval
         working-directory: apps/backend
